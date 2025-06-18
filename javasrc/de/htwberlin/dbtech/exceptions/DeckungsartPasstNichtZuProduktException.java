@@ -9,8 +9,9 @@ public class DeckungsartPasstNichtZuProduktException extends VersicherungExcepti
         super();
     }
 
-    public DeckungsartPasstNichtZuProduktException(Integer produktIdAusDeckungart, Integer produktIdAusVertrag) {
-        super("produktIdAusDeckungart: " + produktIdAusDeckungart + " <-> produktIdAusVertrag: " + produktIdAusVertrag);
+    public DeckungsartPasstNichtZuProduktException(Integer deckungsartId) {
+        super("Die Deckungsart mit ID " + deckungsartId + " passt nicht zum Produkt des Vertrags.");
     }
+
 
 }

@@ -12,33 +12,24 @@ import java.sql.Connection;
 public interface IVersicherungService {
 
     /**
-     * Speichert die uebergebene Datenbankverbindung in einer Instanzvariablen.
+     * Speichert die Verbindung zur Datenbank,
+     * damit wir später damit arbeiten können.
      */
     void setConnection(Connection connection);
 
     /**
-     * Fuegt eine Deckung einem Vertrag hinzu.
+     * Fügt eine neue Versicherung (Deckung) zu einem Vertrag hinzu.
      *
-     * @param vertragsId     Fremdschluessel auf den Vertrag.
-     * @param deckungsartId  Fremdschluessel auf die Deckungsart.
-     * @param deckungsbetrag Betrag, der gedeckt werden soll.
-     * @throws VertragExistiertNichtException          wenn vertragsId kein
-     *                                                 gueltiger Primaerschluessel
-     *                                                 fuer Vertraege ist.
-     * @throws DeckungsartExistiertNichtException      wenn deckungsartId kein
-     *                                                 gueltiger Primaerschluessel
-     *                                                 fuer Deckungsarten ist.
-     * @throws UngueltigerDeckungsbetragException      wenn der Deckungsbetrag fuer
-     *                                                 die gegebene Deckung nicht
-     *                                                 angeboten wird.
-     * @throws DeckungsartPasstNichtZuProduktException wenn die Deckungsart nicht
-     *                                                 fuer das Produkt des Vertrags
-     *                                                 passt.
-     * @throws DeckungsartNichtRegelkonformException   wenn eine Ablehnungsregel
-     *                                                 zutrifft
-     * @throws DeckungspreisNichtVorhandenException    wenn fuer einen
-     *                                                 Deckungsbetrag kein Preis
-     *                                                 vorliegt
+     * @param vertragsId     Die Nummer vom Vertrag (also von wem die Versicherung ist).
+     * @param deckungsartId  Die Nummer der Versicherungsart (z. B. Glas, Feuer, usw.).
+     * @param deckungsbetrag Wie viel Geld abgesichert werden soll.
+     *
+     * @throws VertragExistiertNichtException Wenn der Vertrag nicht gefunden wird.
+     * @throws DeckungsartExistiertNichtException Wenn die Versicherungsart nicht existiert.
+     * @throws UngueltigerDeckungsbetragException Wenn der Betrag nicht erlaubt ist.
+     * @throws DeckungsartPasstNichtZuProduktException Wenn diese Art nicht zu diesem Vertrag passt.
+     * @throws DeckungsartNichtRegelkonformException Wenn Regeln sagen: Diese Art geht hier nicht (z. B. wegen Alter).
+     * @throws DeckungspreisNichtVorhandenException Wenn wir keinen Preis für diese Versicherung finden.
      */
     void createDeckung(Integer vertragsId, Integer deckungsartId, BigDecimal deckungsbetrag);
 

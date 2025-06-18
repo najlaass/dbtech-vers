@@ -24,21 +24,32 @@ import java.math.BigDecimal;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class VersicherungServiceJavaTest {
+
+    // Hiermit können wir Text ins Log schreiben, also zum Nachschauen, was passiert ist.
     private static final Logger L = LoggerFactory.getLogger(VersicherungServiceJavaTest.class);
     private static IDatabaseConnection dbTesterCon = null;
 
+    // Das ist unser Service, mit dem wir Deckungen anlegen wollen.
     private static final IVersicherungService vService = new VersicherungService();
 
+    // Das passiert einmal ganz am Anfang, bevor die Tests starten.
     @BeforeClass
     public static void setUp() {
         L.debug("setUp: start");
         try {
+            // Wir verbinden uns mit der Datenbank zum Testen.
             IDatabaseTester dbTester = new JdbcDatabaseTester(DbCred.driverClass, DbCred.url, DbCred.user, DbCred.password,
                     DbCred.schema);
             dbTesterCon = dbTester.getConnection();
+
+            // Wir lesen Testdaten aus CSV-Dateien ein.
             IDataSet datadir = new CsvDataSet(new File("test-data/ue03-04"));
             dbTester.setDataSet(datadir);
+
+            // Die Datenbank wird zuerst geleert, dann füllen wir sie neu mit den Testdaten.
             DatabaseOperation.CLEAN_INSERT.execute(dbTesterCon, datadir);
+
+            // Jetzt sagen wir dem Service, dass er mit dieser Datenbank arbeiten soll.
             vService.setConnection(dbTesterCon.getConnection());
         } catch (Exception e) {
             DbUnitUtils.closeDbUnitConnectionQuietly(dbTesterCon);
@@ -46,6 +57,7 @@ public class VersicherungServiceJavaTest {
         }
     }
 
+    // Ganz am Ende wird die Verbindung zur Datenbank wieder geschlossen.
     @AfterClass
     public static void tearDown() {
         L.debug("tearDown: start");
@@ -53,7 +65,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Vertrag existiert nicht.
+     * Wir probieren eine Deckung zu machen – aber der Vertrag gibt’s gar nicht.
+     * Da soll ein Fehler kommen.
      */
     @org.junit.Test(expected = VertragExistiertNichtException.class)
     public void createDeckung01() {
@@ -61,7 +74,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Deckungsart existiert nicht.
+     * Hier versuchen wir eine Deckung mit einer falschen Art.
+     * Diese Deckungsart kennt das System gar nicht – also Fehler!
      */
     @org.junit.Test(expected = DeckungsartExistiertNichtException.class)
     public void createDeckung02() {
@@ -69,8 +83,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Deckungsart passt nicht zu Produkt. Deckungsart 1 (Haftung) passt zu KFZV,
-     * der Vertrag 5 ist aber fuer HRV.
+     * Die Deckungsart passt nicht zu dem Produkt vom Vertrag.
+     * Also: passt nicht zusammen = Fehler.
      */
     @org.junit.Test(expected = DeckungsartPasstNichtZuProduktException.class)
     public void createDeckung03() {
@@ -78,9 +92,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Deckungsbetrag ist ungueltig für Deckungsart 6 (Fahrraddiebstahl), da kein
-     * Deckungsbetragsdatensatz fuer die Deckungsart vorliegt. Fuer Deckungsart 6
-     * gibt es keinen Datenssatz in der Tabelle Deckungsbetrag.
+     * Für diese Deckungsart wissen wir nicht, wie viel Geld erlaubt ist.
+     * Deshalb klappt es nicht.
      */
     @org.junit.Test(expected = UngueltigerDeckungsbetragException.class)
     public void createDeckung04() {
@@ -88,8 +101,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Deckungsbetrag 2000 ist ungueltig für Deckungsart 5 (Glasbruch), da nur ein
-     * Deckungsbetrag von 1500 fuer die Deckungsart vorliegt.
+     * Wir wollen zu viel absichern – mehr als erlaubt.
+     * System sagt: nö, das geht nicht.
      */
     @org.junit.Test(expected = UngueltigerDeckungsbetragException.class)
     public void createDeckung05() {
@@ -97,8 +110,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Deckungsbetrag 1500 ist zwar gueltig fuer Deckungsart 5 (Glasbruch), es gibt
-     * aber keinen Deckungspreis dafuer.
+     * Der Betrag ist okay, aber es gibt keinen Preis dafür.
+     * Also weiß das System nicht, was es tun soll.
      */
     @org.junit.Test(expected = DeckungspreisNichtVorhandenException.class)
     public void createDeckung06() {
@@ -106,10 +119,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Deckungsbetrag 150000 ist gueltig fuer Deckungsart 4 (Brandschaden), da ein
-     * Deckungsbetrag von 150000 existiert. Einen Deckungspreis fuer diesen
-     * Deckungsbetrag gibt es auch. Allerdings wird dieser Preis nur bis Ende 2018
-     * angeboten. Der Versicherungsbeginn fuer Vertrag 5 liegt aber in 2019.
+     * Die Deckung ist zwar gültig, aber der Preis dafür gilt nur bis 2018.
+     * Der Vertrag ist aus 2019 – zu spät also.
      */
     @org.junit.Test(expected = DeckungspreisNichtVorhandenException.class)
     public void createDeckung07() {
@@ -117,10 +128,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Vertrag 6 (KFZV) hat einen Kunden, der noch nicht 18 Jahre alt ist. Deckungsart 1
-     * (Haftung) passt zu KFZV und Deckungsbetrag 100 Mio ebenfalls. Haftung wird
-     * aber fuer Kunden unter 18 nicht angeboten.
-     * Achtung: Alter bezieht sich auf Versicherungszeitraum
+     * Der Kunde ist unter 18 Jahre – für ihn darf man keine Haftung machen.
+     * Deshalb soll es nicht gehen.
      */
     @org.junit.Test(expected = DeckungsartNichtRegelkonformException.class)
     public void createDeckung08() {
@@ -128,10 +137,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Vertrag 7 (LBV) hat einen Kunden, der der aelter als 90 Jahre ist.
-     * Deckungsart 3 (Tod) passt zu LBV und Deckungsbetrag 100 Tsd ebenfalls. Tod
-     * wird aber fuer Kunden ueber 90 nicht angeboten.
-     * Achtung: Alter bezieht sich auf Versicherungszeitraum
+     * Der Kunde ist über 90 Jahre – für ihn darf man keine Todesversicherung machen.
+     * Deshalb gibt’s einen Fehler.
      */
     @org.junit.Test(expected = DeckungsartNichtRegelkonformException.class)
     public void createDeckung09() {
@@ -139,10 +146,7 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Vertrag 8 (LBV) hat einen Kunden, der der aelter als 70 Jahre ist.
-     * Deckungsart 3 (Tod) passt zu LBV und Deckungsbetrag 200 Tsd ebenfalls. Tod
-     * mit einem Betrag von 200 Tsd wird aber fuer Kunden ueber 70 nicht angeboten.
-     * Achtung: Alter bezieht sich auf Versicherungszeitraum
+     * Der Kunde ist über 70 – bei so einem hohen Betrag darf man keine Todesdeckung machen.
      */
     @org.junit.Test(expected = DeckungsartNichtRegelkonformException.class)
     public void createDeckung10() {
@@ -150,10 +154,8 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Vertrag 9 (LBV) hat einen Kunden, der der aelter als 60 Jahre ist.
-     * Deckungsart 3 (Tod) passt zu LBV und Deckungsbetrag 300 Tsd ebenfalls. Tod
-     * mit einem Betrag von 300 Tsd wird aber fuer Kunden ueber 60 nicht angeboten.
-     * Achtung: Alter bezieht sich auf Versicherungszeitraum
+     * Der Kunde ist über 60 – da darf man keine Todesdeckung mit 300 Tsd machen.
+     * Also ist das nicht erlaubt.
      */
     @org.junit.Test(expected = DeckungsartNichtRegelkonformException.class)
     public void createDeckung11() {
@@ -161,39 +163,41 @@ public class VersicherungServiceJavaTest {
     }
 
     /**
-     * Die folgenden Deckungserzeugungen sind ok und muessen in der Datebank
-     * eingetragen werden.
-     * Achtung: Alter bezieht sich auf Versicherungszeitraum
+     * Jetzt machen wir drei Deckungen, die alle richtig sind.
+     * Danach schauen wir, ob sie wirklich in der Datenbank stehen.
      */
     @org.junit.Test
     public void createDeckung12() throws Exception {
         Integer[] vertragsIds = new Integer[]{5, 8, 9};
         Integer[] deckungsartIds = new Integer[]{4, 3, 3};
-        BigDecimal[] deckungsbetraege = new BigDecimal[]{BigDecimal.valueOf(50000), BigDecimal.valueOf(100000),
-                BigDecimal.valueOf(200000)};
+        BigDecimal[] deckungsbetraege = new BigDecimal[]{
+                BigDecimal.valueOf(50000),
+                BigDecimal.valueOf(100000),
+                BigDecimal.valueOf(200000)
+        };
+
         for (int i = 0; i < 3; i++) {
             vService.createDeckung(vertragsIds[i], deckungsartIds[i], deckungsbetraege[i]);
         }
 
-        // Hole Deckungsdatensaetze aus der Datenbank
+        // Jetzt holen wir die Daten aus der Datenbank
         QueryDataSet databaseDataSet = new QueryDataSet(dbTesterCon);
         String sql = "select * from Deckung where Vertrag_FK in (5, 8, 9) order by Vertrag_FK, Deckungsart_FK";
         databaseDataSet.addTable("Deckung", sql);
         ITable tblDeckung = databaseDataSet.getTable("Deckung");
 
-        // Wurde die richtige Anzahl an Datensaetzen in die Datenbank eingetragen?
+        // Wir prüfen, ob wirklich 3 Zeilen da sind
         Assert.assertEquals("Falsche Anzahl Zeilen", 3, tblDeckung.getRowCount());
 
-        // Wurden die richtigen Werte eingetragen?
+        // Jetzt schauen wir, ob die Werte stimmen
         for (int i = 0; i < 3; i++) {
             Integer vertragsId = ((BigDecimal) tblDeckung.getValue(i, "Vertrag_FK")).intValue();
             Integer deckungsartId = ((BigDecimal) tblDeckung.getValue(i, "Deckungsart_FK")).intValue();
             BigDecimal deckungsbetrag = (BigDecimal) tblDeckung.getValue(i, "Deckungsbetrag");
+
             Assert.assertEquals("Falsche vertragsId", vertragsIds[i], vertragsId);
             Assert.assertEquals("Falsche deckungsartId", deckungsartIds[i], deckungsartId);
             Assert.assertEquals("Falscher deckungsbetrag", deckungsbetraege[i], deckungsbetrag);
         }
-
     }
-
 }
